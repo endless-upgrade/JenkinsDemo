@@ -12,13 +12,20 @@
 
 # Deploy di Jenkins 2.91 per Mondadori
 
+-----------
+**Attenzione** Se ti trovi dietro a un proxy e installi Jenkins su una VM in localhost, nessun servizio Git* sarà in grado di connettersi ad esso.
+
+Se non ti trovi dietro un proxy ti basta sostituire "localhost" con il tuo **IP pubblico** nei vari webhook.
+
+-------- 
+
 ## Installazione VM
 
 * Download di Centos v6.7 da http://archive.kernel.org/centos-vault/6.7/isos/x86_64/
 
 ---
 
-## Creazione macchina virtuale si Virtual Box:
+## Creazione macchina virtuale su GCP o simile:
 * Centos v6.7
 * 8 GB RAM
 * 20 GB Hdd
@@ -232,7 +239,7 @@ sudo service jenkins start
 Starting Jenkins                                           [  OK  ]
 
 ```
-E collegati alla pagina `http://localhost:8080`, dovrebbe aprirsi una pagina del genere.
+E collegati alla pagina `http://35.196.238.203:8080`, dovrebbe aprirsi una pagina del genere.
 
 ![alt text][unlock_jenkins]
 
@@ -335,7 +342,7 @@ Inoltre puoi impostare una serie di comandi che vengono fatti durante la build, 
 
 ### Configurazione Webhook GitHub
 
-Un webhook è un collegamento che permette di scatenare un determinato evento tra due differenti servizi web. In questo caso, vogliamo fare in modo che, nel momento in cui viene fatto il commit di su GitHub, venga fatta una POST `http://localhost:8080/hithub-webhook`. Questa chiamata scatenerà build, test, deploy e compagnia bella.
+Un webhook è un collegamento che permette di scatenare un determinato evento tra due differenti servizi web. In questo caso, vogliamo fare in modo che, nel momento in cui viene fatto il commit di su GitHub, venga fatta una POST `http://35.196.238.203:8080/hithub-webhook`. Questa chiamata scatenerà build, test, deploy e compagnia bella.
 
 La configurazioni deve essere fatta lato GitHub, al momento è implementata come un servizio, non come un webhook, andiamo quindi nella pagina **Integration & Services**
 
