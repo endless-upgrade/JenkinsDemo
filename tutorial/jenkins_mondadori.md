@@ -316,7 +316,7 @@ e inseriamo nome utente e email dell'account usato nel repository.
 
 Non possiamo però ancora accedere al repository, la configurazione sarà completata all'inserimento del link (prossia sezione).
 
-## Demo
+## Demo Git Hub
 
 Nella homepage creiamo un *New Job* dal pulsante centrale se non ne abbiamo o da *New Item* a sinistra.
 
@@ -353,7 +353,317 @@ Imposta il link del server su cui è presente jenkins.
 ![alt text](hook_jenkins_url.png)
 
 
-## Jenkins GitLab Demo
+## Demo GitLab
 
-//TODO
+Seguirò questa [guida](https://medium.com/@teeks99/continuous-integration-with-jenkins-and-gitlab-fa770c62e88a).
 
+GitLab ha davvero un sacco di problemi con Jenkins, da quel che dice il web funziona solo con la versione enterprise di GitLab, oppure con il tool di CI proprietario di GitLab.
+
+Al momento utilizzo:
+* GitLab 9.5.4
+* GitLab Plugin [1.5.2](https://github.com/jenkinsci/gitlab-plugin)
+
+
+Per questa combinazione di versioni esiste una [Know Issue](https://gitlab.com/gitlab-org/gitlab-ce/issues/37288) e [issue2](https://github.com/jenkinsci/gitlab-plugin/issues/608) per cui il bottone "Webhook" test di Git Lab lancia una POST errata, vedremo al momento del test come gestirlo.
+
+
+### Chiave SSH per il deploy
+
+Per prima cosa è necessario configurare una chiare RSA per il deploy, questa procedura è comoda perchè permette al server jenkins di accedere ai repository di nostro interesse, senza la necessità di creare utenti "dummy" con diritti custom.
+
+#### Generare la chiave
+
+```bash
+su
+Password: ****
+
+cd /var/lib/jenkins/.ssh
+sudo -u jenkins ssh-keygen
+
+Generating public/private rsa key pair.
+Enter file in which to save the key (/var/lib/jenkins/.ssh/id_rsa): id_rsa
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in id_rsa.
+Your public key has been saved in id_rsa.pub.
+The key fingerprint is:
+SHA256:pELwRD6I+aWPm3XZ2R2mbZxh018dLNL4BBSm9/LPbzY jenkins@devops-worker
+The keys randomart image is:
++---[RSA 2048]----+
+|  ..o     .=.    |
+| o *      o + .  |
+|o . *   .. + + o |
+| . + . o  . =.. o|
+|  o . . S  .*o. o|
+|   o . o o Bo= ..|
+|  . o o o o *.  .|
+|   + .     .  oEo|
+|  o            =+|
++----[SHA256]-----+
+```
+
+Una volta generata la chiave, copiala e inseriscila nel repository GitLab
+
+```bash
+cat id_rsa.pub 
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC9WxJsoJXl1XpMQk2bAaRSfKzYjBq5NeNOkhzvCP2cnyKm0NK409IlWpDpTec5qOSaOsJ6e0IGftKHXVRXLnH39jOWZVGEbZ096pzZIyGZAMdq2xM+Azm6CpcS6Vl/XGyer8gtsvKDJ5kD5q8EUFALKV6y642V7dh6UIcacyQuL6tF6xumaCLW+20ASUmkucqmDQ9aSi08c8HsxiIIAQmZs6XCS8ecCRoO8LyhLCLSguwwaMFtWpomINTOApH/6k9nQDWWM3Kl/1+uUoomAyuj7G1zj7gHAp4oxXO5/rIZ4l0Ynvyw9ods8/NWmy6349/5nXnITuDOafrQLJnaj0Dv jenkins@devops-worker
+```
+#### Inserire la chiave su GitLab
+
+Apri il repository GitLab a cui vuoi applicare la Chiave di Deploy
+
+![alt text](gitlab.png)
+
+Settings -> Repository -> Deploy Keys
+
+![alt text](deploy_keys.png)
+
+Dai un nome alla chiave, copiala e spunta *Write access allowed*
+
+![alt text](add_key.png)
+
+#### Inserire la chiave in jenkins
+
+La stssa chiave deve essere inserita in Jenkins, per farlo vai in Credentials -> System -> freccina nel dominio -> Add Credentials
+
+![alt text](jenkins_add_rsa.png)
+
+![alt text](jenkins_config_rsa.png)
+
+### Creare un Access Token GitLab
+
+Accedere alle configurazioni del profilo in GitLab -> Access Tokens
+
+![alt text](gitlab_profile_settings.png)
+
+Dai un nome al tuo token e seleziona una expiration date
+
+![alt text](gitlab_pat.png)
+
+[//]: <> (d5188a5c982e87a9a9207e13bcb94677)
+
+Viene quindi generato e mostrato il tuo Personal Access Token super segretissimo, mi raccomando **SALVALO** perchè non te lo faranno vedere mai più.
+
+Metti quindi il token in jenkins creando una nuova Credentials come prima.
+
+![alt text](jenkins_pat.png)
+
+### Configurare la connessione tra Jenkins e GitLab
+
+Torniamo in Manage Jenkins -> Configure System.
+
+Sotto **Git Lab** sarà tutto rosso-incazzato, inserisci le informazioni richieste e sarà contento.
+
+Fai **attenzione**, il *Gitlab host URL non è quello del tuo progetto, ma la radice, cioè il server su cui gira Gitlab.
+
+Premendo *Test Connection* potrai ottenere un dolcissimo e gratificante *Success*.
+
+![alt text](jenkins_gitlab_connection.png)
+
+### Creazione del Job Jenkins
+
+Esattamente come per Github, notare che la *GitLab Connection* viene inserita da sola
+![alt text](so_good.jpg)
+![alt text](gitlab_job.png)
+
+Nella sezione *Gestione Codice Sorgente* inserisci
+
+Config  | Value
+------- | -------
+URL     | url del repository Git Lab
+Credentials | Le credenzioni RSA configurate con l'utente jenkins
+Name    | origin
+Refspec | +refs/heads/*:refs/remotes/origin/* +refs/merge-requests/*/head:refs/remotes/origin/merge-requests/*
+Branch  | origin/${gitlabSourceBranch}
+
+![alt text](jenkins_scm.png)
+
+Impostiamo in modo che la compilazione avvenga ogni volta che avviene un qualche evento sul repository. Ovviamente configurare sulla base delle proprie esigenze.
+
+**Attenzione** Segnati l'URL del servizio, nel mio caso http://35.196.238.203:8080/project/GitLab-demo.
+
+![alt text](jenkins_job_trigger.png)
+
+Aggiugi i passi di compilazione utili: **QUI VERRANNO INSERITI I TEST DIREI**
+
+![alt text](jenkins_job_compilation_step.png)
+
+Aggiungi un'azione di post compilazione, possiamo per esempio inviare una email a destinatari custom, oppure, ome in questo caso, mostrare sulla GUI di GitLab lo stato del commit. 
+
+![alt text](jenkins_job_post.png)
+
+### Creazione webhook lato GitLab
+
+Lato GitLab è necessario configurare il Webhook in modo che venga fatta una POST in risposta a desterminati eventi.
+Ovviamente configura il webhook in modo consistente con la configurazione degli eventi in jenkins.
+
+![alt text](gitlab_webhook.png)
+
+**********************************************************
+
+## Test
+
+Ok, dovrebbe essere tutto a posto, ora fai qualche test.
+
+<!--
+Commando    |   Stato CSRF  |   Risultato
+------------|---------------|------------- 
+http://35.196.238.203:8080/job/gitlab/                                                  |on|   403 No valid crumb 
+http://jenkins:538e8c802c3f50f3dea529eaf68dcb69@35.196.238.203:8080/job/gitlab/build    |on|   403 No valid crumb 
+http://jenkins:538e8c802c3f50f3dea529eaf68dcb69@35.196.238.203:8080/job/gitlab/build    |off|   WORKING
+http://jenkins:538e8c802c3f50f3dea529eaf68dcb69@35.196.238.203:8080/project/gitlab      |on|   404 Not Found
+http://35.196.238.203:8080/project/gitlab/                                              |on|   404 Not Found
+curl -X POST  -H "Jenkins-Crumb:34549b0579c5d49eb3ee3a93a17e5d0a" http://localhost:8080/job/gitlab/build    |on|    WORKING
+curl -X POST  -H "Jenkins-Crumb:34549b0579c5d49eb3ee3a93a17e5d0a" http://35.196.238.203:8080/job/gitlab/build    |on|    403
+**http://35.196.238.203:8080/job/gitlab/build with `Jenkins-Crumb:dbb48add58a1862a3e0ea949143eb754` header**    |**on**|    **WORKING!**
+
+[More Info](https://support.cloudbees.com/hc/en-us/articles/219257077-CSRF-Protection-Explained)
+
+#### Per ottenere Crumb Anonimo
+
+curl 'http://localhost:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,":",//crumb)'
+
+#### Per ottenre Crumb con utente
+
+curl -u "utente:password" 'http://localhost:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,":",//crumb)'
+
+**Il crumb dipende sia dal nome utente che dall'IP** per questo la chiamata a `localhost` funziona mentre quella a `35.196.238.203` non funziona!!
+
+# Il grosso problema è che non è possibile inserire il Crumb nella chiamata GitLab :(
+    Quindi o disabiliti il CSRF o FANCULO!!!!
+    Opto per installare GitLab 7.4.3 e testare
+-------------->
+
+Come già detto, esiste una know issure per cui il bottone "Webhook Test" di Git Lab (nella pagina di configurazione del webhook) invia una chiamata POST con un header errato.
+Per testare che tutto funzioni possiamo quindi effettuare un normale commit oppure usare un tool come [Postman](https://www.getpostman.com/) per simulare la chimata REST.
+
+
+### Postman
+
+#### URL
+```
+http://35.196.238.203:8080/project/GitLab-demo
+```
+#### Headers
+```
+Content-Type:application/json
+X-Gitlab-Event:Push Hook
+X-Gitlab-Token:d5188a5c982e87a9a9207e13bcb94677
+```
+#### Body
+```json
+{
+  "object_kind": "push",
+  "event_name": "push",
+  "before": "e35bfb275c5953be8acf19284618061749684de8",
+  "after": "062380a3f6421bc376568f19b0445385fbdeaf2c",
+  "ref": "refs/heads/master",
+  "checkout_sha": "062380a3f6421bc376568f19b0445385fbdeaf2c",
+  "message": null,
+  "user_id": 119,
+  "user_name": "Dario Pasquali",
+  "user_username": "d.pasquali",
+  "user_email": "d.pasquali@reply.it",
+  "user_avatar": "http://www.gravatar.com/avatar/3fd07fe896722b6563f7ef62824d9bec?s=80&d=identicon",
+  "project_id": 147,
+  "project": {
+    "name": "jenkins-CI-test",
+    "description": "PoC of Jenkins CI with GitLab",
+    "web_url": "http://jarvis.datareply.eu/d.pasquali/jenkins-CI-test",
+    "avatar_url": null,
+    "git_ssh_url": "git@jarvis.datareply.eu:d.pasquali/jenkins-CI-test.git",
+    "git_http_url": "http://jarvis.datareply.eu/d.pasquali/jenkins-CI-test.git",
+    "namespace": "d.pasquali",
+    "visibility_level": 20,
+    "path_with_namespace": "d.pasquali/jenkins-CI-test",
+    "default_branch": "master",
+    "ci_config_path": null,
+    "homepage": "http://jarvis.datareply.eu/d.pasquali/jenkins-CI-test",
+    "url": "git@jarvis.datareply.eu:d.pasquali/jenkins-CI-test.git",
+    "ssh_url": "git@jarvis.datareply.eu:d.pasquali/jenkins-CI-test.git",
+    "http_url": "http://jarvis.datareply.eu/d.pasquali/jenkins-CI-test.git"
+  },
+  "commits": [
+    {
+      "id": "062380a3f6421bc376568f19b0445385fbdeaf2c",
+      "message": "test\n",
+      "timestamp": "2017-11-27T19:18:17+01:00",
+      "url": "http://jarvis.datareply.eu/d.pasquali/jenkins-CI-test/commit/062380a3f6421bc376568f19b0445385fbdeaf2c",
+      "author": {
+        "name": "d.pasquali",
+        "email": "d.pasquali@reply.it"
+      },
+      "added": [
+
+      ],
+      "modified": [
+        "prova.sh"
+      ],
+      "removed": [
+
+      ]
+    },
+    {
+      "id": "e35bfb275c5953be8acf19284618061749684de8",
+      "message": "initial commit\n",
+      "timestamp": "2017-11-27T19:15:12+01:00",
+      "url": "http://jarvis.datareply.eu/d.pasquali/jenkins-CI-test/commit/e35bfb275c5953be8acf19284618061749684de8",
+      "author": {
+        "name": "d.pasquali",
+        "email": "d.pasquali@reply.it"
+      },
+      "added": [
+        "prova.sh"
+      ],
+      "modified": [
+
+      ],
+      "removed": [
+
+      ]
+    }
+  ],
+  "total_commits_count": 2,
+  "repository": {
+    "name": "jenkins-CI-test",
+    "url": "git@jarvis.datareply.eu:d.pasquali/jenkins-CI-test.git",
+    "description": "PoC of Jenkins CI with GitLab",
+    "homepage": "http://jarvis.datareply.eu/d.pasquali/jenkins-CI-test",
+    "git_http_url": "http://jarvis.datareply.eu/d.pasquali/jenkins-CI-test.git",
+    "git_ssh_url": "git@jarvis.datareply.eu:d.pasquali/jenkins-CI-test.git",
+    "visibility_level": 20
+  }
+}
+```
+Non avremo alcun feedback su Postman ma, aprendo la dashboard jenkins, vedrmo che la build è in corso...
+![alt-text](jenkins_build.png)
+
+...e poi viene aggiornato il conteggio dall'ultima compilazione
+![alt-text](jenkins_build_done.png)
+
+Cliccando sul job possiamo vedere il report di build, in questo caso essendo una push di test, non avremo nessun cambiamento.
+![alt-text](jenkins_build_done2.png)
+
+### Commit & Push
+
+Ripetiamo il test facendo un commit & push.
+![alt-text](bash_push.png)
+
+Non appena viene fatto il push parte il build sulla dashboard jenkins.
+![alt-text](jenkins_build_2.png)
+
+Al termine del quale potremo ammirare il nuovo cambiamento avvenuto con successo.
+![alt-text](jenkins_build_done3.png)
+
+E il report console, dove possiamo notare i nostri passi di compilazione.
+![alt-text](jenkins_build_done_console.png)
+
+### Fallimento
+
+Si noti che, in caso di fallimento, sia jenkins che GitLab mostreranno il l'evento. Per testare questa casistica ho inserito una `istruzione_inesistente` tra i passi di build, tutto il job fallisce se anche uno solo dei passi fallisce (anche se jenkins mostra la percentuale di completamento).
+
+![alt-text](jenkins_build_fail.png)
+
+Su GitLab possiamo osservare la differenza tra un push terminato con successo o fallimento.
+
+![alt-text](jenkins_build_fail_gitlab.png)
