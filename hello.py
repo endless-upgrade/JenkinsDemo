@@ -1,1 +1,1 @@
-print "hello Sto gran cazzdasdadsasddsao!"
+print "Hello World :D"
