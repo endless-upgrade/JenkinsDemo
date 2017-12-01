@@ -1,2 +1,2 @@
 print "Hello World :D"
-print "Ciao Jenkins !!!!!!"
+print "Ciao Jenkins !"
