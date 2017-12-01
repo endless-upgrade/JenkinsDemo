@@ -9,7 +9,7 @@ pipeline {
     stage('Test') {
       agent {
         docker {
-          image 'python:2.7.0'
+          image 'python:2'
         }
         
       }
