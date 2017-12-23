@@ -1,0 +1,10 @@
+pipeline {
+  agent any
+  stages {
+    stage('Config System') {
+      steps {
+        echo 'Setup the system'
+      }
+    }    
+  }
+}
